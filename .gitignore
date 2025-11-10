@@ -317,3 +317,5 @@ cython_debug/
 # pixi environments
 .pixi
 *.egg-info
+/pkg/
+/week01/austen-gpt/
