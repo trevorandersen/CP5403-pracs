@@ -11,6 +11,7 @@ import types
 from pathlib import Path
 
 import nbformat
+import requests
 
 
 def _extract_imports(src: str):
@@ -36,6 +37,23 @@ def _extract_imports(src: str):
 
 
 def _extract_defs_and_classes_from_code(src):
+    def _is_header_complete(header_lines):
+        header = "\n".join(header_lines).rstrip()
+        if not header.endswith(":"):
+            return False
+
+        # Track bracket balance for multiline signatures
+        # like:
+        # def fn(
+        #     arg,
+        # ):
+        balance = (
+            header.count("(") - header.count(")")
+            + header.count("[") - header.count("]")
+            + header.count("{") - header.count("}")
+        )
+        return balance <= 0
+
     lines = src.splitlines()
     kept = []
     i = 0
@@ -46,14 +64,22 @@ def _extract_defs_and_classes_from_code(src):
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
-            if j < len(lines) and lines[j].lstrip().startswith(("def ", "class ")):
+            if j < len(lines) and lines[j].lstrip().startswith(("def ", "class ", "async def ")):
                 kept.append(line)
                 i += 1
                 continue
-        if stripped.startswith("def ") or stripped.startswith("class "):
+        if stripped.startswith(("def ", "class ", "async def ")):
             kept.append(line)
             base_indent = len(line) - len(stripped)
             i += 1
+
+            # Handle multiline signatures before consuming the function/class body.
+            header_lines = [line]
+            while i < len(lines) and not _is_header_complete(header_lines):
+                header_lines.append(lines[i])
+                kept.append(lines[i])
+                i += 1
+
             while i < len(lines):
                 nxt = lines[i]
                 if nxt.strip() == "":
@@ -122,3 +148,25 @@ def import_definitions_from_notebook(nb_dir_or_path, notebook_name=None, *, extr
 
     exec(src, mod.__dict__)
     return mod
+
+
+def download_file(url, out_dir="."):
+    """Simple file download utility for tests."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    filename = Path(url).name
+    dest = out_dir / filename
+
+    if dest.exists():
+        return dest
+
+    try:
+        response = requests.get(url, stream=True, timeout=30)
+        response.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        return dest
+    except Exception as e:
+        raise RuntimeError(f"Failed to download {url}: {e}")

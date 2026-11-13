@@ -65,7 +65,7 @@ class Llama3Model(nn.Module):
         self.final_norm = nn.RMSNorm(cfg["emb_dim"], eps=1e-5, dtype=cfg["dtype"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
 
-        # Reusuable utilities
+        # Reusable utilities
         cos, sin = compute_rope_params(
             head_dim=cfg["emb_dim"] // cfg["n_heads"],
             theta_base=cfg["rope_base"],
@@ -82,22 +82,26 @@ class Llama3Model(nn.Module):
         x = tok_embeds
 
         num_tokens = x.shape[1]
+        pos_start = self.current_pos if cache is not None else 0
+        pos_end = pos_start + num_tokens
+        if pos_end > self.cfg["context_length"]:
+            raise ValueError(
+                f"Sequence length {pos_end} exceeds the model's context length "
+                f"of {self.cfg['context_length']} tokens."
+            )
+
         if cache is not None:
-            pos_start = self.current_pos
-            pos_end = pos_start + num_tokens
             self.current_pos = pos_end
             mask = torch.triu(
                 torch.ones(pos_end, pos_end, device=x.device, dtype=torch.bool), diagonal=1
             )[pos_start:pos_end, :pos_end]
         else:
-            pos_start = 0  # Not strictly necessary but helps torch.compile
             mask = torch.triu(
                 torch.ones(num_tokens, num_tokens, device=x.device, dtype=torch.bool), diagonal=1
             )
         # Shape (1, 1, num_tokens, num_tokens) to broadcast across batch and heads
         mask = mask[None, None, :, :]
 
-        next_cache = []
         for i, block in enumerate(self.trf_blocks):
             blk_cache = cache.get(i) if cache else None
             x, new_blk_cache = block(x, mask, self.cos, self.sin,
@@ -105,7 +109,6 @@ class Llama3Model(nn.Module):
                                      cache=blk_cache)
             if cache is not None:
                 cache.update(i, new_blk_cache)
-            next_cache.append(new_blk_cache)
 
         x = self.final_norm(x)
         logits = self.out_head(x.to(self.cfg["dtype"]))

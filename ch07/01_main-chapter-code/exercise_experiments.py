@@ -12,10 +12,10 @@ import math
 import os
 import re
 import time
-import urllib
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
+import requests
 import tiktoken
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -128,9 +128,14 @@ class LoRALayer(torch.nn.Module):
         torch.nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))  # similar to standard weight initialization
         self.B = torch.nn.Parameter(torch.zeros(rank, out_dim))
         self.alpha = alpha
+        self.rank = rank
 
     def forward(self, x):
-        x = self.alpha * (x @ self.A @ self.B)
+        # Book formula:      alpha_book * (x @ A @ B)
+        # Canonical formula: (alpha_canonical / rank) * (x @ A @ B)
+        # For the same rank and matrices, they are equal when alpha_canonical = alpha_book * rank.
+        # Here, alpha_book=16 and rank=16 give alpha_canonical=256, so 256 / 16 = 16.
+        x = (self.alpha / self.rank) * (x @ self.A @ self.B)
         return x
 
 
@@ -234,17 +239,17 @@ def custom_collate_with_masking_fn(
 
 
 def download_and_load_file(file_path, url):
-
     if not os.path.exists(file_path):
-        with urllib.request.urlopen(url) as response:
-            text_data = response.read().decode("utf-8")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        text_data = response.text
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(text_data)
     else:
         with open(file_path, "r", encoding="utf-8") as file:
             text_data = file.read()
 
-    with open(file_path, "r") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         data = json.load(file)
 
     return data
@@ -313,11 +318,13 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     #######################################
     # Download and prepare dataset
     #######################################
-    file_path = "instruction-data.json"
-
     if alpaca52k:
+        # Use a separate file name so that the instruction-data.json that ships in
+        # this folder is not loaded instead of the 52k Alpaca dataset
+        file_path = "alpaca_data.json"
         url = "https://raw.githubusercontent.com/tatsu-lab/stanford_alpaca/main/alpaca_data.json"
     else:
+        file_path = "instruction-data.json"
         url = "https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/main/ch07/01_main-chapter-code/instruction-data.json"
     data = download_and_load_file(file_path, url)
 
@@ -426,7 +433,8 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
 
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"Total trainable parameters after: {total_params:,}")
-        replace_linear_with_lora(model, rank=16, alpha=16)
+        # alpha / rank = 256 / 16 = 16 preserves the book's original scaling.
+        replace_linear_with_lora(model, rank=16, alpha=256)
 
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"Total trainable LoRA parameters: {total_params:,}")
@@ -534,7 +542,7 @@ if __name__ == "__main__":
 
     import argparse
 
-    parser = argparse.ArgumentParser(
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         description="Instruction finetune a GPT model"
     )
     options = {"baseline", "mask_instructions", "alpaca_52k", "phi3_prompt", "lora"}

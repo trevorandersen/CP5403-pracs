@@ -58,12 +58,17 @@ This automatically downloads the weight file based on the model choice above:
 
 ```python
 import os
-import urllib.request
+import requests
 
 url = f"https://huggingface.co/rasbt/llama-3.2-from-scratch/resolve/main/{MODEL_FILE}"
 
 if not os.path.exists(MODEL_FILE):
-    urllib.request.urlretrieve(url, MODEL_FILE)
+    response = requests.get(url, stream=True, timeout=60)
+    response.raise_for_status()
+    with open(MODEL_FILE, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
     print(f"Downloaded to {MODEL_FILE}")
 ```
 
@@ -236,7 +241,7 @@ token_ids = generate_text_simple(
 )
 ```
 
-Note that the peak memory usage is only listed for Nvidia CUDA devices, as it is easier to calculate. However, the memory usage on other devices is likely similar as it uses a similar precision format, and the KV cache storage results in even lower memory usage here for the generated 150-token text (however, different devices may implement matrix multiplication differently and may result in different peak memory requirements; and KV-cache memory may increase prohibitively for longer contexts lengths).
+Note that the peak memory usage is only listed for Nvidia CUDA devices, as it is easier to calculate. However, the memory usage on other devices is likely similar as it uses a similar precision format, and the KV cache storage results in even lower memory usage here for the generated 150-token text (however, different devices may implement matrix multiplication differently and may result in different peak memory requirements; and KV-cache memory may increase prohibitively for longer context lengths).
 
 | Model       | Mode              | Hardware        | Tokens/sec | GPU Memory (VRAM) |
 | ----------- | ----------------- | --------------- | ---------- | ----------------- |

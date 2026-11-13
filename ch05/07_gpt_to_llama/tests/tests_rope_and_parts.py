@@ -83,7 +83,7 @@ def litgpt_apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> 
     rotated = torch.cat((-x2, x1), dim=-1)  # (B, nh, T, hs)
     if cos.dim() > 1:
         # batch dimensions must align
-        # sin/cos are (B, T, hs) so we unsqeeze -3 for nh
+        # sin/cos are (B, T, hs) so we unsqueeze -3 for nh
         # we count from back because all of apply_rope does
         cos = cos.unsqueeze(-3)
         sin = sin.unsqueeze(-3)
@@ -177,6 +177,10 @@ def test_rope_llama2(notebook):
             max_position_embeddings: int = 8192
             hidden_size = head_dim * num_heads
             num_attention_heads = num_heads
+            rope_parameters = {"rope_type": "default", "rope_theta": theta_base}
+
+            def standardize_rope_params(self):
+                return
 
         config = RoPEConfig()
         rot_emb = LlamaRotaryEmbedding(config=config)
@@ -242,6 +246,10 @@ def test_rope_llama3(notebook):
             max_position_embeddings: int = 8192
             hidden_size = head_dim * num_heads
             num_attention_heads = num_heads
+            rope_parameters = {"rope_type": "default", "rope_theta": theta_base}
+
+            def standardize_rope_params(self):
+                return
 
         config = RoPEConfig()
         rot_emb = LlamaRotaryEmbedding(config=config)
@@ -320,6 +328,10 @@ def test_rope_llama3_12(notebook):
         max_position_embeddings: int = 8192
         hidden_size = head_dim * num_heads
         num_attention_heads = num_heads
+        rope_parameters = {**hf_rope_params, "rope_theta": rope_theta}
+
+        def standardize_rope_params(self):
+            return
 
     config = RoPEConfig()
 

@@ -6,9 +6,9 @@
 
 import os
 import time
-import urllib.request
 
 import matplotlib.pyplot as plt
+import requests
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -444,18 +444,22 @@ def main(gpt_config, settings, rank, world_size):
 
     torch.manual_seed(123)
 
+    if torch.cuda.is_available():
+        capability = torch.cuda.get_device_capability()
+        if capability[0] >= 8:  # Ampere (8.0+) and newer
+            # Kept for float32 experiments; this setting does not affect bfloat16 matmuls.
+            torch.set_float32_matmul_precision("high")
+
     # NEW: Print info only on 1 GPU
     if rank == 0:
         print(f"PyTorch version: {torch.__version__}")
         if torch.cuda.is_available():
             print(f"CUDA version: {torch.version.cuda}")
 
-            capability = torch.cuda.get_device_capability()
-            if capability[0] >= 7:  # Volta (7.0+), Turing (7.5+), Ampere (8.0+), Hopper (9.0+)
-                torch.set_float32_matmul_precision("high")
-                print("Uses tensor cores")
+            if capability[0] >= 8:
+                print("TF32 enabled for float32 matmuls")
             else:
-                print("Tensor cores not supported on this GPU. Using default precision.")
+                print("TF32 is not supported on this GPU.")
         print()
 
     ##############################
@@ -468,11 +472,11 @@ def main(gpt_config, settings, rank, world_size):
     # NEW: Only download 1 time
     if rank == 0:
         if not os.path.exists(file_path):
-            with urllib.request.urlopen(url) as response:
-                text_data = response.read().decode('utf-8')
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            text_data = response.text
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(text_data)
-
     # NEW: All processes wait until rank 0 is done, using the GPU index.
     torch.distributed.barrier(device_ids=[device.index])
 

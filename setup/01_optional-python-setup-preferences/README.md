@@ -6,7 +6,7 @@ There are several ways to install Python and set up your computing environment. 
 
 <br>
 
-> **Note:** 
+> **Note:**
 > If you are running any of the notebooks on Google Colab and want to install the dependencies, simply run the following code in a new cell at the top of the notebook and skip the rest of this tutorial:
 > `pip install uv && uv pip install --system -r https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/refs/heads/main/requirements.txt`
 
@@ -30,9 +30,9 @@ This section guides you through the Python setup and package installation proced
 >
 > If you are a macOS or Linux user and prefer the native `uv` commands, refer to the [./native-uv.md tutorial](./native-uv.md). I also recommend checking the official [`uv` documentation](https://docs.astral.sh/uv/).
 >
-> The `uv add` syntax also applies to Windows users. However, I found that some dependencies in the `pyproject.toml` cause problems on Windows. So, for Windows users, I recommend `pix` instead, which has a similar `pixi add` workflow like `uv add`. For more information, see the [./native-pixi.md tutorial](./native-pixi.md).
+> The `uv add` syntax also applies to Windows users. However, I found that some dependencies in the `pyproject.toml` cause problems on Windows. So, for Windows users, I recommend `pixi` instead, which has a similar `pixi add` workflow like `uv add`. For more information, see the [./native-pixi.md tutorial](./native-pixi.md).
 >
-> While `uv add` and `pixi add` offer additional speed advantages, I think that `uv pip` is slightly more user-friendly, making it a good starting point for beginners. However, if you're new to Python package management, the native `uv` interface is also a great opportunity to learn it from the start. It's also how I use `uv` now, but I realize it the barrier to entry is a bit higher if you are coming from `pip` and `conda`.
+> While `uv add` and `pixi add` offer additional speed advantages, I think that `uv pip` is slightly more user-friendly, making it a good starting point for beginners. However, if you're new to Python package management, the native `uv` interface is also a great opportunity to learn it from the start. It's also how I use `uv` now, but I realize the barrier to entry is a bit higher if you are coming from `pip` and `conda`.
 
 
 
@@ -132,7 +132,7 @@ Note that you need to activate the virtual environment each time you start a new
 
 <img src="https://sebastianraschka.com/images/LLMs-from-scratch-images/setup/uv-setup/venv-activate-1.png" width="600" height="auto" alt="Venv activated">
 
-Optionally, you can deactivate the environment it by executing the command `deactivate`.
+Optionally, you can deactivate the environment by executing the command `deactivate`.
 
 <img src="https://sebastianraschka.com/images/LLMs-from-scratch-images/setup/uv-setup/venv-activate-2.png" width="800" height="auto" alt="Venv deactivated">
 
@@ -151,6 +151,7 @@ To install all required packages from a `requirements.txt` file (such as the one
 uv pip install -r requirements.txt
 ```
 
+
 Alternatively, install the latest dependencies directly from the repository:
 
 ```bash
@@ -168,13 +169,20 @@ uv pip install -r https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/refs
 > or
 > `pip install -U -r https://raw.githubusercontent.com/rasbt/LLMs-from-scratch/refs/heads/main/requirements.txt`
 
+&nbsp;
+
+> **Optional dependencies for bonus materials:**
+> To include the optional dependencies used throughout the bonus materials, install the `bonus` dependency group from the project root:
+>  `uv pip install --group bonus`
+> This is useful if you don't want to install them separately as you check out the optional bonus materials later on.
+
 <br>
 
 **Finalizing the setup**
 
 That’s it! Your environment should now be ready for running the code in the repository.
 
-Optionally, you can run an environment check by executing the `python_environment_check.py` script in this repostiory:
+Optionally, you can run an environment check by executing the `python_environment_check.py` script in this repository:
 
 ```bash
 python setup/02_installing-python-libraries/python_environment_check.py
@@ -288,7 +296,7 @@ conda install jupyterlab watermark
 
 
 
-You can also still use `pip` to install libraries. By default, `pip` should be linked to your new `LLms` conda environment:
+You can also still use `pip` to install libraries. By default, `pip` should be linked to your new `LLMs` conda environment:
 
 <img src="https://sebastianraschka.com/images/LLMs-from-scratch-images/setup/01_optional-python-setup-preferences/check-pip.png" alt="check-pip" width="600px">
 

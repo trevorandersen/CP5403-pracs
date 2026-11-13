@@ -34,7 +34,7 @@ def preprocess_text(text):
     # Lowercase the text
     text = text.lower()
     # Remove punctuation
-    text = re.sub(r'[^\w\s]', '', text)
+    text = re.sub(r"[^\w\s]", "", text)
     return text
 
 
@@ -42,15 +42,18 @@ def find_near_duplicates(json_data, threshold=0.75, key="instruction"):
     """The higher the threshold, the more similar the texts have to be to match"""
 
     # Extract instructions
-    text = [preprocess_text(item[key]) for item in json_data if item[key]]
+    # (entries with an empty value are skipped, so we keep track of the original
+    # indices to map the rows of the similarity matrix back to json_data)
+    data_indices = [index for index, item in enumerate(json_data) if item[key]]
+    text = [preprocess_text(json_data[index][key]) for index in data_indices]
     near_duplicates = []
     indices_to_remove = set()
 
     if not text:
-        return {}, near_duplicates
+        return json_data, near_duplicates
 
     # Vectorize the text data
-    vectorizer = TfidfVectorizer(stop_words=None, analyzer='char', ngram_range=(1, 3))
+    vectorizer = TfidfVectorizer(stop_words=None, analyzer="char", ngram_range=(1, 3))
     tfidf_matrix = vectorizer.fit_transform(text)
 
     # Compute cosine similarity between each pair of entries
@@ -61,11 +64,12 @@ def find_near_duplicates(json_data, threshold=0.75, key="instruction"):
     for i in range(len(cos_sim_matrix)):
         for j in range(i+1, len(cos_sim_matrix)):
             if cos_sim_matrix[i, j] > threshold:
-                if len(json_data[i][key]) <= 1 or len(json_data[j][key]) <= 1:
+                item_i, item_j = json_data[data_indices[i]], json_data[data_indices[j]]
+                if len(item_i[key]) <= 1 or len(item_j[key]) <= 1:
                     continue
-                near_duplicates.append((json_data[i], json_data[j], cos_sim_matrix[i, j]))
+                near_duplicates.append((item_i, item_j, cos_sim_matrix[i, j]))
                 if key in ("input", "output"):  # Don't remove duplicates based on the instruction
-                    indices_to_remove.add(j)  # Mark the second entry for removal
+                    indices_to_remove.add(data_indices[j])  # Mark the second entry for removal
 
     # Remove the near-duplicate entries
     filtered_json_data = [item for index, item in enumerate(json_data) if index not in indices_to_remove]
@@ -84,7 +88,7 @@ def find_print_and_remove_near_duplicates(json_data, remove_duplicates=False, th
             json_data, near_duplicates = find_near_duplicates(json_data, key=key, threshold=threshold)
         else:
             _, near_duplicates = find_near_duplicates(json_data, key=key, threshold=threshold)
-        separator = 50 * '='
+        separator = 50 * "="
         print(f"\n\n{separator}\nSearching '{key}' for duplicates ...\n{separator}")
         if not near_duplicates:
             print("No duplicates found")
@@ -100,7 +104,7 @@ def find_print_and_remove_near_duplicates(json_data, remove_duplicates=False, th
 if __name__ == "__main__":
     print("scikit-learn version:", sklearn_version)
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--json_file",
         type=str,
@@ -114,7 +118,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--remove_duplicates",
-        action='store_true',
+        action="store_true",
         default=False,
         help=(
             "Removes duplicates based on the 'input' or 'output' keys "
