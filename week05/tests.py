@@ -7,9 +7,7 @@
 
 import pytest
 from gpt_train import main
-import http.client
-from urllib.parse import urlparse
-
+import requests
 
 @pytest.fixture
 def gpt_config():
@@ -43,23 +41,23 @@ def test_main(gpt_config, other_settings):
 
 
 def check_file_size(url, expected_size):
-    parsed_url = urlparse(url)
-    if parsed_url.scheme == "https":
-        conn = http.client.HTTPSConnection(parsed_url.netloc)
-    else:
-        conn = http.client.HTTPConnection(parsed_url.netloc)
+    try:
+        response = requests.head(url, allow_redirects=True, timeout=30)
+        if response.status_code != 200:
+            return False, f"{url} not accessible"
 
-    conn.request("HEAD", parsed_url.path)
-    response = conn.getresponse()
-    if response.status != 200:
-        return False, f"{url} not accessible"
-    size = response.getheader("Content-Length")
-    if size is None:
-        return False, "Content-Length header is missing"
-    size = int(size)
-    if size != expected_size:
-        return False, f"{url} file has expected size {expected_size}, but got {size}"
-    return True, f"{url} file size is correct"
+        size = response.headers.get("Content-Length")
+        if size is None:
+            return False, "Content-Length header is missing"
+
+        size = int(size)
+        if size != expected_size:
+            return False, f"{url} file has expected size {expected_size}, but got {size}"
+
+        return True, f"{url} file size is correct"
+
+    except requests.exceptions.RequestException as e:
+        return False, f"Failed to access {url}: {e}"
 
 
 def test_model_files():
@@ -99,3 +97,28 @@ def test_model_files():
 
     check_model_files(base_url="https://openaipublic.blob.core.windows.net/gpt-2/models")
     check_model_files(base_url="https://f001.backblazeb2.com/file/LLMs-from-scratch/gpt2")
+
+
+@pytest.mark.parametrize("source, expected_hosts", [
+    (None, ["openaipublic.blob.core.windows.net", "huggingface.co", "f001.backblazeb2.com"]),
+    ("openai", ["openaipublic.blob.core.windows.net"]),
+    ("hf", ["huggingface.co"]),
+    ("backblaze", ["f001.backblazeb2.com"]),
+])
+def test_gpt2_download_source_order(source, expected_hosts, monkeypatch, tmp_path):
+    from urllib.parse import urlsplit
+
+    pytest.importorskip("tensorflow")
+    from gpt_download import download_and_load_gpt2
+
+    attempted_hosts = []
+
+    def unavailable(url, **kwargs):
+        attempted_hosts.append(urlsplit(url).hostname)
+        raise requests.ConnectionError("Host unavailable")
+
+    monkeypatch.setattr(requests, "get", unavailable)
+    options = {} if source is None else {"source": source}
+    with pytest.raises(requests.ConnectionError):
+        download_and_load_gpt2("124M", tmp_path, **options)
+    assert attempted_hosts == expected_hosts
