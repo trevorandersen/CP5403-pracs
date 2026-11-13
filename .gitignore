@@ -354,3 +354,4 @@ cython_debug/
 *.egg-info
 /pkg/
 /week01/austen-gpt/
+/.virtual_documents/
